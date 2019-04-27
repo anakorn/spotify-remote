@@ -58,6 +58,7 @@ class App extends Component {
             });
             this.setState({ accessToken });
         }
+        // Expire access token and force login
         if (Date.now() > accessTokenExpireDate) {
             this.setState({ accessToken: null });
         }
