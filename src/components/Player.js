@@ -1,50 +1,43 @@
 import React from 'react';
+import { groupBy, prop } from 'ramda';
+import './Player.css';
+
+const groupBySongUri = groupBy(prop('songUri'));
 
 const Player = ({
-    onPrev,
-    onNext,
-    onScrubBack,
-    onScrubForward,
-    onLoadMarker,
-    onSaveMarker,
-    onDeleteMarker,
-    markers,
-}) => (
-    <div>
-        <div>
-            <button onClick={onPrev}>
-                {'|<'}
-            </button>
-            <button onClick={onScrubBack}>
-                {'<<'}
-            </button>
-            <button onClick={onScrubForward}>
-                {'>>'}
-            </button>
-            <button onClick={onNext}>
-                {'>|'}
-            </button>
+    onAddClip,
+    onPlayClip,
+    clips,
+}) => {
+    const clipsBySongUri = groupBySongUri(clips);
+    return (
+        <div className="grid-container p-2">
+            <div className="p-4 flex justify-center">
+                <button onClick={() => onAddClip(15000)}>
+                    {'🎬'}
+                </button>
+            </div>
+            <div className="playlist p-4">
+                {Object.keys(clipsBySongUri).map(songUri => (
+                    <div key={songUri}>
+                        <h4>{songUri}</h4>
+                        <ol>
+                            {clipsBySongUri[songUri].map(({ clip, id }) => (
+                                <li key={id}>
+                                    <span>
+                                        {`${clip.start} - ${clip.end}`}
+                                    </span>
+                                    <button onClick={() => onPlayClip(id)}>
+                                        {'▶️'}
+                                    </button>
+                                </li>
+                            ))}
+                        </ol>
+                    </div>
+                ))}
+            </div>
         </div>
-        <div>
-            <button onClick={onSaveMarker}>
-                Save
-            </button>
-            {Object.keys(markers).map((songUri) => (
-                <div>
-                    <p>{songUri}</p>
-                    <ol>
-                        {markers[songUri].map(marker => (
-                            <li>
-                                <button onClick={() => onLoadMarker(marker)}>Load</button>
-                                <button onClick={() => onDeleteMarker(songUri, marker)}>X</button>
-                                {marker}
-                            </li>
-                        ))}
-                    </ol>
-                </div>
-            ))}
-        </div>
-    </div>
-);
+    )
+};
 
 export default Player;

@@ -1,80 +1,77 @@
-import React from 'react';
+import React, { useReducer } from 'react';
 import Player from '../components/Player';
 
-const withPlayer = (Component) => class extends React.Component {
-    constructor(props) {
-        super(props);
-        this.state = {
-            markers: {}
-        };
-    }
+const initialClips = [];
 
-    componentDidMount() {
-        this.setState({
-            // Read existing markers from storage
-            markers: JSON.parse(window.localStorage.getItem('markers')) || {}
-        });
-    }
-
-    async saveMarker() {
-        const { progress_ms, item } = await this.getCurrentTrack();
-        const markers = {
-            ...this.state.markers,
-            // Store current track progress
-            [item.uri]: (this.state.markers[item.uri] || []).concat(progress_ms)
-        };
-        this.setState({ markers });
-        window.localStorage.setItem('markers', JSON.stringify(markers));
-    }
-
-    deleteMarker(songUri, marker) {
-        this.setState({
-            markers: {
-                ...this.state.markers,
-                [songUri]: this.state.markers[songUri].filter(_marker => _marker !== marker)
-            }
-        });
-    }
-
-    async getCurrentTrack() {
-        return (await window.spotify.get('/me/player/currently-playing')).data;
-    }
-
-    async prev() {
-        const progressMs = (await this.getCurrentTrack()).progress_ms;
-        if (progressMs < 2500) {
-            return window.spotify.post('/me/player/previous');
-        }
-        return this.seek(0);
-    }
-
-    async next() {
-        return window.spotify.post('/me/player/next');
-    }
-
-    async seek(positionMs) {
-        return (await window.spotify.put(`/me/player/seek?position_ms=${positionMs}`)).data;
-    }
-
-    async scrub(amountMs) {
-        const progressMs = (await this.getCurrentTrack()).progress_ms;
-        return this.seek(progressMs + amountMs);
-    }
-
-    render() {
-        return (
-            <Player
-                onPrev={() => this.prev()}
-                onNext={() => this.next()}
-                onScrubBack={() => this.scrub(-5000)}
-                onScrubForward={() => this.scrub(5000)}
-                onLoadMarker={(progressMs) => this.seek(progressMs)}
-                onSaveMarker={() => this.saveMarker()}
-                onDeleteMarker={(uri, marker) => this.deleteMarker(uri, marker)}
-                markers={this.state.markers}
-            />
-        );
+const clipsReducer = (clips, action) => {
+    console.info(`[REDUCER] State:`);
+    console.info(clips);
+    switch (action.type) {
+        case 'CLIP_ADD':
+            console.info(`[REDUCER] CLIP_ADD: ${JSON.stringify(action)}`);
+            return [
+                ...clips,
+                {
+                    id: 'foo',
+                    songUri: action.songUri,
+                    clip: action.clip,
+                }
+            ];
+        case 'CLIP_DELETE':
+            console.info(`[REDUCER] CLIP_DELETE: ${JSON.stringify(action)}`);
+            return clips.filter(clip => clip.id !== action.clipId);
+        case 'CLIP_PLAY':
+            console.info(`[REDUCER] CLIP_PLAY: ${JSON.stringify(action)}`);
+            const { songUri, clip } = clips.find(clip => clip.id === action.clipId);
+            loop(songUri, clip.start, clip.end);
+            return clips;
+        default:
+            throw new Error();
     }
 };
 
-export default withPlayer(Player);
+const setTimeoutP = waitMs => new Promise((resolve, reject) => setTimeout(() => resolve(), waitMs));
+
+const loop = async (songUri, start, end) => new Promise(async (resolve, reject) => {
+    const waitMs = end - start;
+    await seek(songUri, start);
+    await setTimeoutP(waitMs);
+    return await loop(songUri, start, end);
+});
+
+const seek = async (songUri, positionMs) => {
+    await playSong(songUri, positionMs);
+    return (await window.spotify.put(`/me/player/seek?position_ms=${positionMs}`)).data;
+};
+
+const playSong = async (songUri, positionMs = 0) => {
+    return await window.spotify.put(`/me/player/play`, { uris: [songUri], position_ms: positionMs });
+};
+
+const getCurrentSong = async () => {
+    const res = (await window.spotify.get(`/me/player/currently-playing`)).data;
+    return [res.item.uri, res.progress_ms];
+};
+
+const PlayerContainer = () => {
+    const [clips, dispatch] = useReducer(clipsReducer, initialClips);
+    return (
+        <Player
+            onAddClip={async (duration) => {
+                const [songUri, progressMs] = await getCurrentSong();
+                dispatch({
+                    type: 'CLIP_ADD',
+                    songUri,
+                    clip: {
+                        start: progressMs,
+                        end: progressMs + duration
+                    }
+                });
+            }}
+            onPlayClip={(clipId) => dispatch({ type: 'CLIP_PLAY', clipId })}
+            clips={clips}
+        />
+    );
+};
+
+export default PlayerContainer;
