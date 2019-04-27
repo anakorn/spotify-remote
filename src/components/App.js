@@ -30,9 +30,10 @@ const LOGIN_URL =
     + '&scope=user-modify-playback-state user-read-playback-state';
 
 // Grab access token from url and put in local storage
-const urlAccessToken = getHashQueryParams(window.location.hash).access_token;
-if (urlAccessToken) {
-    window.localStorage.setItem('accessToken', urlAccessToken);
+const { access_token, expires_in } = getHashQueryParams(window.location.hash);
+if (access_token) {
+    window.localStorage.setItem('accessToken', access_token);
+    window.localStorage.setItem('accessTokenExpireDate', Date.now() + expires_in * 1000);
     window.location.replace(REDIRECT_URI);
 }
 
@@ -46,6 +47,7 @@ class App extends Component {
 
     componentDidMount() {
         const accessToken = window.localStorage.getItem('accessToken');
+        const accessTokenExpireDate = window.localStorage.getItem('accessTokenExpireDate');
         if (accessToken) {
             // Create a spotify client that has oauth headers pre-set
             window.spotify = axios.create({
@@ -55,6 +57,9 @@ class App extends Component {
                 }
             });
             this.setState({ accessToken });
+        }
+        if (Date.now() > accessTokenExpireDate) {
+            this.setState({ accessToken: null });
         }
     }
 
