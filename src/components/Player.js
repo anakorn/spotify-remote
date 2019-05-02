@@ -1,20 +1,37 @@
 import React from 'react';
-import { groupBy, prop } from 'ramda';
+import 'rc-slider/assets/index.css';
+import { groupBy, path } from 'ramda';
 import './Player.css';
+import Slider, { createSliderWithTooltip } from 'rc-slider';
 
-const groupBySongUri = groupBy(prop('songUri'));
+const Range = createSliderWithTooltip(Slider.Range);
+
+const groupBySongUri = groupBy(path(['song', 'uri']));
 
 const Player = ({
     onAddClip,
+    onDeleteClip,
     onPlayClip,
+    onScrubBack,
+    onScrubForward,
+    onEditClipStart,
+    onEditClipEnd,
     clips,
 }) => {
     const clipsBySongUri = groupBySongUri(clips);
     return (
         <div className="grid-container p-2">
             <div className="p-4 flex justify-center">
-                <button onClick={() => onAddClip(15000)}>
+                <button onClick={onAddClip}>
                     {'🎬'}
+                </button>
+            </div>
+            <div className="p-4 flex justify-center">
+                <button onClick={onScrubBack}>
+                    {'<<'}
+                </button>
+                <button onClick={onScrubForward}>
+                    {'>>'}
                 </button>
             </div>
             <div className="playlist p-4">
@@ -22,7 +39,7 @@ const Player = ({
                     <div key={songUri}>
                         <h4>{songUri}</h4>
                         <ol>
-                            {clipsBySongUri[songUri].map(({ clip, id }) => (
+                            {clipsBySongUri[songUri].map(({ song, clip, id }) => (
                                 <li key={id}>
                                     <span>
                                         {`${clip.start} - ${clip.end}`}
@@ -30,6 +47,18 @@ const Player = ({
                                     <button onClick={() => onPlayClip(id)}>
                                         {'▶️'}
                                     </button>
+                                    <button onClick={() => onDeleteClip(id)}>
+                                        {'X'}
+                                    </button>
+                                    <Range
+                                        defaultValue={[clip.start, clip.end]}
+                                        min={0}
+                                        max={song.durationMs}
+                                        onAfterChange={([start, end]) => {
+                                            onEditClipStart(id, parseInt(start, 10));
+                                            onEditClipEnd(id, parseInt(end, 10));
+                                        }}
+                                    />
                                 </li>
                             ))}
                         </ol>

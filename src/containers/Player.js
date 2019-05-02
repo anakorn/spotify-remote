@@ -1,19 +1,14 @@
 import React, { useReducer } from 'react';
 import Player from '../components/Player';
+import uuidv1 from 'uuid/v1';
+import * as R from 'ramda';
 
-const hashCode = (str) => {
-    var hash = 0, i, chr;
-    if (str.length === 0) return hash;
-    for (i = 0; i < str.length; i++) {
-        chr   = str.charCodeAt(i);
-        hash  = ((hash << 5) - hash) + chr;
-        hash |= 0; // Convert to 32bit integer
-    }
-    return hash;
-};
+const DEFAULT_CLIP_DURATION_MS = 5000;
+const DEFAULT_SCRUB_DELTA_MS = 5000;
 
 const initialClips = [];
 
+// TODO: split reducers once this becomes too unwieldy
 const clipsReducer = (clips, action) => {
     console.info(`[REDUCER] State:`);
     console.info(clips);
@@ -23,63 +18,105 @@ const clipsReducer = (clips, action) => {
             return [
                 ...clips,
                 {
-                    id: hashCode(`${action.songUri}:${action.clip.start}:${action.clip.end}`),
-                    songUri: action.songUri,
+                    id: uuidv1(),
+                    song: action.song,
                     clip: action.clip,
                 }
             ];
         case 'CLIP_DELETE':
             console.info(`[REDUCER] CLIP_DELETE: ${JSON.stringify(action)}`);
+            if (clips.active && clips.active.id === action.clipId) {
+                window.clearInterval(clips.active.intervalId);
+            }
             return clips.filter(clip => clip.id !== action.clipId);
         case 'CLIP_PLAY':
             console.info(`[REDUCER] CLIP_PLAY: ${JSON.stringify(action)}`);
-            const { songUri, clip } = clips.find(clip => clip.id === action.clipId);
-            loop(songUri, clip.start, clip.end);
+            let { song, clip } = clips.find(clip => clip.id === action.clipId);
+            window.clearInterval(clips.active && clips.active.intervalId);
+            clips.active = {
+                id: action.clipId,
+                intervalId: loop(song.uri, clip.start, clip.end)
+            };
             return clips;
+        case 'CLIP_EDIT_START':
+            console.info(`[REDUCER] CLIP_EDIT_START: ${JSON.stringify(action)}`);
+            return updateClip(
+                action.clipId,
+                clip => ({ ...clip, start: action.start }),
+                clips
+            );
+        case 'CLIP_EDIT_END':
+            console.info(`[REDUCER] CLIP_EDIT_END: ${JSON.stringify(action)}`);
+            return updateClip(
+                action.clipId,
+                clip => ({ ...clip, end: action.end }),
+                clips
+            );
         default:
             throw new Error();
     }
 };
 
-const setTimeoutP = waitMs => new Promise((resolve, reject) => setTimeout(() => resolve(), waitMs));
+const updateClip = (id, update, clips) => {
+    let clipIdx = R.findIndex(R.propEq('id', id), clips);
+    let clipData = clips[clipIdx];
+    return R.update(clipIdx, {
+        ...clipData,
+        clip: update(clipData.clip)
+    }, clips);
+};
 
-const loop = async (songUri, start, end) => new Promise(async (resolve, reject) => {
-    const waitMs = end - start;
-    await seek(songUri, start);
-    await setTimeoutP(waitMs);
-    return await loop(songUri, start, end);
-});
+const loop = (songUri, start, end) => {
+    const intervalMs = end - start;
+    // TODO some race condition bug here where playing a clip while another
+    // clip is playing will cause both to overlap and play on top of each other
+    seek(songUri, start);
+    return window.setInterval(() => console.log(`playing ${songUri} start ${start} end ${end}`) || seek(songUri, start, end), intervalMs);
+};
 
 const seek = async (songUri, positionMs) => {
     await playSong(songUri, positionMs);
     return (await window.spotify.put(`/me/player/seek?position_ms=${positionMs}`)).data;
 };
 
+const seekDelta = async (delta) => {
+    const [item, progress_ms] = await getCurrentSong();
+    return seek(item.uri, progress_ms + delta);
+};
+
 const playSong = async (songUri, positionMs = 0) => {
-    return await window.spotify.put(`/me/player/play`, { uris: [songUri], position_ms: positionMs });
+    return window.spotify.put(`/me/player/play`, { uris: [songUri], position_ms: positionMs });
 };
 
 const getCurrentSong = async () => {
     const res = (await window.spotify.get(`/me/player/currently-playing`)).data;
-    return [res.item.uri, res.progress_ms];
+    return [res.item, res.progress_ms];
 };
 
 const PlayerContainer = () => {
     const [clips, dispatch] = useReducer(clipsReducer, initialClips);
     return (
         <Player
-            onAddClip={async (duration) => {
-                const [songUri, progressMs] = await getCurrentSong();
+            onAddClip={async () => {
+                const [item, progressMs] = await getCurrentSong();
                 dispatch({
                     type: 'CLIP_ADD',
-                    songUri,
+                    song: {
+                        uri: item.uri,
+                        durationMs: item.duration_ms
+                    },
                     clip: {
                         start: progressMs,
-                        end: progressMs + duration
+                        end: progressMs + DEFAULT_CLIP_DURATION_MS
                     }
                 });
             }}
+            onDeleteClip={(clipId) => dispatch({ type: 'CLIP_DELETE', clipId })}
             onPlayClip={(clipId) => dispatch({ type: 'CLIP_PLAY', clipId })}
+            onScrubBack={() => seekDelta(-DEFAULT_SCRUB_DELTA_MS)}
+            onScrubForward={() => seekDelta(DEFAULT_SCRUB_DELTA_MS)}
+            onEditClipStart={(clipId, start) => dispatch({ type: 'CLIP_EDIT_START', clipId, start })}
+            onEditClipEnd={(clipId, end) => dispatch({ type: 'CLIP_EDIT_END', clipId, end })}
             clips={clips}
         />
     );
