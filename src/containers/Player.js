@@ -6,52 +6,69 @@ import * as R from 'ramda';
 const DEFAULT_CLIP_DURATION_MS = 5000;
 const DEFAULT_SCRUB_DELTA_MS = 5000;
 
-const initialClips = [];
+const initialState = {
+    clips: [],
+    activeClip: {}
+};
 
 // TODO: split reducers once this becomes too unwieldy
-const clipsReducer = (clips, action) => {
+const reducer = (state, action) => {
     console.info(`[REDUCER] State:`);
-    console.info(clips);
+    console.info(state);
     switch (action.type) {
         case 'CLIP_ADD':
             console.info(`[REDUCER] CLIP_ADD: ${JSON.stringify(action)}`);
-            return [
-                ...clips,
-                {
-                    id: uuidv1(),
-                    song: action.song,
-                    clip: action.clip,
-                }
-            ];
+            return {
+                ...state,
+                clips: [
+                    ...state.clips,
+                    {
+                        id: uuidv1(),
+                        song: action.song,
+                        clip: action.clip,
+                    }
+                ]
+            };
         case 'CLIP_DELETE':
             console.info(`[REDUCER] CLIP_DELETE: ${JSON.stringify(action)}`);
-            if (clips.active && clips.active.id === action.clipId) {
-                window.clearInterval(clips.active.intervalId);
+            if (state.activeClip.id === action.clipId) {
+                window.clearInterval(state.activeClip.intervalId);
             }
-            return clips.filter(clip => clip.id !== action.clipId);
+            return {
+                ...state,
+                clips: state.clips.filter(clip => clip.id !== action.clipId)
+            };
         case 'CLIP_PLAY':
             console.info(`[REDUCER] CLIP_PLAY: ${JSON.stringify(action)}`);
-            let { song, clip } = clips.find(clip => clip.id === action.clipId);
-            window.clearInterval(clips.active && clips.active.intervalId);
-            clips.active = {
-                id: action.clipId,
-                intervalId: loop(song.uri, clip.start, clip.end)
+            let { song, clip } = state.clips.find(clip => clip.id === action.clipId);
+            window.clearInterval(state.activeClip.intervalId);
+            return {
+                ...state,
+                activeClip: {
+                    id: action.clipId,
+                    intervalId: loop(song.uri, clip.start, clip.end)
+                }
             };
-            return clips;
         case 'CLIP_EDIT_START':
             console.info(`[REDUCER] CLIP_EDIT_START: ${JSON.stringify(action)}`);
-            return updateClip(
-                action.clipId,
-                clip => ({ ...clip, start: action.start }),
-                clips
-            );
+            return {
+                ...state,
+                clips: updateClip(
+                    action.clipId,
+                    clip => ({ ...clip, start: action.start }),
+                    state.clips
+                )
+            };
         case 'CLIP_EDIT_END':
             console.info(`[REDUCER] CLIP_EDIT_END: ${JSON.stringify(action)}`);
-            return updateClip(
-                action.clipId,
-                clip => ({ ...clip, end: action.end }),
-                clips
-            );
+            return {
+                ...state,
+                clips: updateClip(
+                    action.clipId,
+                    clip => ({ ...clip, end: action.end }),
+                    state.clips
+                )
+            };
         default:
             throw new Error();
     }
@@ -94,7 +111,7 @@ const getCurrentSong = async () => {
 };
 
 const PlayerContainer = () => {
-    const [clips, dispatch] = useReducer(clipsReducer, initialClips);
+    const [state, dispatch] = useReducer(reducer, initialState);
     return (
         <Player
             onAddClip={async () => {
@@ -117,7 +134,7 @@ const PlayerContainer = () => {
             onScrubForward={() => seekDelta(DEFAULT_SCRUB_DELTA_MS)}
             onEditClipStart={(clipId, start) => dispatch({ type: 'CLIP_EDIT_START', clipId, start })}
             onEditClipEnd={(clipId, end) => dispatch({ type: 'CLIP_EDIT_END', clipId, end })}
-            clips={clips}
+            clips={state.clips}
         />
     );
 };
