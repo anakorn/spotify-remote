@@ -68,7 +68,7 @@ class App extends Component {
         return (
             this.state.accessToken
                 ? (
-                    <div className="container max-w-md mx-auto px-2">
+                    <div className="w-full mx-auto px-2">
                         <h1 className="Header font-sans font-normal my-2 text-center">
                             Spotify Remote
                         </h1>

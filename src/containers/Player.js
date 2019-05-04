@@ -1,4 +1,4 @@
-import React, { useReducer } from 'react';
+import React, { useReducer, useEffect } from 'react';
 import Player from '../components/Player';
 import uuidv1 from 'uuid/v1';
 import * as R from 'ramda';
@@ -18,7 +18,7 @@ const reducer = (state, action) => {
     switch (action.type) {
         case 'CLIP_ADD':
             console.info(`[REDUCER] CLIP_ADD: ${JSON.stringify(action)}`);
-            return {
+            let newState = {
                 ...state,
                 clips: [
                     ...state.clips,
@@ -29,15 +29,19 @@ const reducer = (state, action) => {
                     }
                 ]
             };
+            localStorage.setItem('state', JSON.stringify(newState));
+            return newState;
         case 'CLIP_DELETE':
             console.info(`[REDUCER] CLIP_DELETE: ${JSON.stringify(action)}`);
             if (state.activeClip.id === action.clipId) {
                 window.clearInterval(state.activeClip.intervalId);
             }
-            return {
+            newState = {
                 ...state,
                 clips: state.clips.filter(clip => clip.id !== action.clipId)
-            };
+            }
+            localStorage.setItem('state', JSON.stringify(newState));
+            return newState;
         case 'CLIP_PLAY':
             console.info(`[REDUCER] CLIP_PLAY: ${JSON.stringify(action)}`);
             let { song, clip } = state.clips.find(clip => clip.id === action.clipId);
@@ -51,7 +55,7 @@ const reducer = (state, action) => {
             };
         case 'CLIP_EDIT_START':
             console.info(`[REDUCER] CLIP_EDIT_START: ${JSON.stringify(action)}`);
-            return {
+            newState = {
                 ...state,
                 clips: updateClip(
                     action.clipId,
@@ -59,9 +63,11 @@ const reducer = (state, action) => {
                     state.clips
                 )
             };
+            localStorage.setItem('state', JSON.stringify(newState));
+            return newState;
         case 'CLIP_EDIT_END':
             console.info(`[REDUCER] CLIP_EDIT_END: ${JSON.stringify(action)}`);
-            return {
+            newState = {
                 ...state,
                 clips: updateClip(
                     action.clipId,
@@ -69,6 +75,10 @@ const reducer = (state, action) => {
                     state.clips
                 )
             };
+            localStorage.setItem('state', JSON.stringify(newState));
+            return newState;
+        case 'STATE_LOAD':
+            return action.state;
         default:
             throw new Error();
     }
@@ -112,6 +122,12 @@ const getCurrentSong = async () => {
 
 const PlayerContainer = () => {
     const [state, dispatch] = useReducer(reducer, initialState);
+
+    useEffect(() => {
+        const loadedState = JSON.parse(localStorage.getItem('state'));
+        dispatch({ type: 'STATE_LOAD', state: loadedState || initialState });
+    });
+
     return (
         <Player
             onAddClip={async () => {
