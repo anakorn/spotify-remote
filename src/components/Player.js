@@ -9,6 +9,8 @@ const Range = createSliderWithTooltip(Slider.Range);
 const groupBySongUri = groupBy(path(['song', 'uri']));
 
 const Player = ({
+    isLoggedIn,
+    loginUrl,
     onAddClip,
     onDeleteClip,
     onPlayClip,
@@ -18,29 +20,27 @@ const Player = ({
     onEditClipEnd,
     clips,
 }) => {
+    if (!isLoggedIn) {
+        return (
+            <a href={loginUrl}>Connect to Spotify</a>
+        );
+    }
     const clipsBySongUri = groupBySongUri(clips);
     return (
         <div className="grid-container p-2">
             <div className="p-4 flex justify-center">
                 <button onClick={onAddClip}>
-                    {'🎬'}
+                    {'CLIP'}
                 </button>
             </div>
-            <div className="p-4 flex justify-center">
-                <button onClick={onScrubBack}>
-                    {'<<'}
-                </button>
-                <button onClick={onScrubForward}>
-                    {'>>'}
-                </button>
-            </div>
-            <div className="playlist p-4">
+            
+            <div className="playlist rounded-lg shadow-inner-deep px-4 py-6">
                 {Object.keys(clipsBySongUri).map(songUri => (
                     <div key={songUri}>
                         <h4>{songUri}</h4>
                         <ol>
                             {clipsBySongUri[songUri].map(({ song, clip, id }) => (
-                                <li key={id}>
+                                <li className="px-4 py-4" key={id}>
                                     <span>
                                         {`${clip.start} - ${clip.end}`}
                                     </span>

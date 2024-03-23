@@ -1,19 +1,2 @@
 html {
-    /* Credit: https://uigradients.com/#Kyoto */
-    /* background: #ffc500; /1* fallback for old browsers *1/ */
-    /* background: linear-gradient(to top, #c21500, #ffc500); */
-    background-color: #2e1f11;
-    background-repeat: repeat;
-    background-attachment: fixed;
-    color: #f1e8a1;
-}
-
-.Header {
-    font-family: Lobster, serif;
-    font-size: 48px;
-    line-height: 1.5;
-    color: transparent;
-    background: linear-gradient(to top left, #c21500, #ffc500);
-    background-clip: text;
-    -webkit-background-clip: text;
 }

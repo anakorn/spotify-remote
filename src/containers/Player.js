@@ -120,7 +120,10 @@ const getCurrentSong = async () => {
     return [res.item, res.progress_ms];
 };
 
-const PlayerContainer = () => {
+const PlayerContainer = ({
+    isLoggedIn,
+    loginUrl
+}) => {
     const [state, dispatch] = useReducer(reducer, initialState);
 
     useEffect(() => {
@@ -130,6 +133,8 @@ const PlayerContainer = () => {
 
     return (
         <Player
+            isLoggedIn={isLoggedIn}
+            loginUrl={loginUrl}
             onAddClip={async () => {
                 const [item, progressMs] = await getCurrentSong();
                 dispatch({

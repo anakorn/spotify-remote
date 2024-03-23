@@ -66,16 +66,10 @@ class App extends Component {
 
     render() {
         return (
-            this.state.accessToken
-                ? (
-                    <div className="w-full mx-auto px-2">
-                        <h1 className="Header font-sans font-normal my-2 text-center">
-                            Spotify Remote
-                        </h1>
-                        <Player />
-                    </div>
-                )
-                : <a href={LOGIN_URL}>Login</a>
+            <Player
+                isLoggedIn={!!this.state.accessToken}
+                loginUrl={LOGIN_URL}
+            />
         );
     }
 }
